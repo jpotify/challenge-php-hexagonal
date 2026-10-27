@@ -1,0 +1,14 @@
+{
+    "data": {
+        "id": "xT9IgzoKnwFNmISR8I",
+        "url": "https://giphy.com/gifs/cat-xT9IgzoKnwFNmISR8I",
+        "title": "Funny Cat GIF",
+        "rating": "g",
+        "username": "catlover",
+        "images": {
+            "original": { "url": "https://media.giphy.com/media/xT9IgzoKnwFNmISR8I/giphy.gif" },
+            "fixed_height": { "url": "https://media.giphy.com/media/xT9IgzoKnwFNmISR8I/200.gif" }
+        }
+    },
+    "meta": { "status": 200, "msg": "OK", "response_id": "abc" }
+}

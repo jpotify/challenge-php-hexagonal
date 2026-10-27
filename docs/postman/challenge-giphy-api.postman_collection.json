@@ -1,0 +1,181 @@
+{
+    "info": {
+        "name": "Challenge PHP Hexagonal - GIPHY API",
+        "description": "REST API (Hexagonal + DDD) que se integra con GIPHY y se protege con OAuth 2.0 (Laravel Passport).\n\nFlujo: ejecutar primero **Login**; su script de test guarda el token en la variable de entorno `token`, que el resto de las requests usa como Bearer token (expira a los 30 minutos).",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "auth": {
+        "type": "bearer",
+        "bearer": [
+            { "key": "token", "value": "{{token}}", "type": "string" }
+        ]
+    },
+    "item": [
+        {
+            "name": "Login",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                            "pm.test('Status is 200', function () {",
+                            "    pm.response.to.have.status(200);",
+                            "});",
+                            "",
+                            "const body = pm.response.json();",
+                            "",
+                            "pm.test('Response has a bearer token that expires in 30 minutes', function () {",
+                            "    pm.expect(body.token).to.be.a('string').and.not.empty;",
+                            "    pm.expect(body.token_type).to.eql('Bearer');",
+                            "    pm.expect(body.expires_in).to.be.within(1790, 1800);",
+                            "});",
+                            "",
+                            "// Store the token in the active environment so the other requests can use it.",
+                            "pm.environment.set('token', body.token);",
+                            "pm.environment.set('token_expires_at', body.expires_at);"
+                        ]
+                    }
+                }
+            ],
+            "request": {
+                "auth": { "type": "noauth" },
+                "method": "POST",
+                "header": [
+                    { "key": "Accept", "value": "application/json" },
+                    { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"email\": \"{{email}}\",\n    \"password\": \"{{password}}\"\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/api/v1/auth/login",
+                    "host": ["{{base_url}}"],
+                    "path": ["api", "v1", "auth", "login"]
+                },
+                "description": "Autentica al usuario y devuelve un token Bearer (OAuth 2.0 / Passport) con expiración de 30 minutos.\n\n**Entrada (JSON)**: `email` (requerido), `password` (requerido).\n\n**Salida 200**: `token`, `token_type`, `expires_in` (segundos), `expires_at`.\n\n**Errores**: `401` credenciales inválidas, `422` validación, `429` demasiados intentos (10 por minuto)."
+            },
+            "response": []
+        },
+        {
+            "name": "Buscar GIFs",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                            "pm.test('Status is 200', function () {",
+                            "    pm.response.to.have.status(200);",
+                            "});",
+                            "",
+                            "pm.test('Response has data and pagination', function () {",
+                            "    const body = pm.response.json();",
+                            "    pm.expect(body.data).to.be.an('array');",
+                            "    pm.expect(body.pagination).to.have.keys('total_count', 'count', 'offset');",
+                            "",
+                            "    if (body.data.length > 0) {",
+                            "        pm.environment.set('gif_id', body.data[0].id);",
+                            "    }",
+                            "});"
+                        ]
+                    }
+                }
+            ],
+            "request": {
+                "method": "GET",
+                "header": [
+                    { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                    "raw": "{{base_url}}/api/v1/gifs?query=cats&limit=5&offset=0",
+                    "host": ["{{base_url}}"],
+                    "path": ["api", "v1", "gifs"],
+                    "query": [
+                        { "key": "query", "value": "cats", "description": "Requerido. Frase o término a buscar (máx. 50 caracteres)." },
+                        { "key": "limit", "value": "5", "description": "Opcional. Cantidad de resultados (1-50, por defecto 25)." },
+                        { "key": "offset", "value": "0", "description": "Opcional. Posición inicial (0-4999, por defecto 0)." }
+                    ]
+                },
+                "description": "Busca GIFs en GIPHY por una frase o término. Requiere autenticación.\n\n**Filtros**: `query` (requerido), `limit` (opcional, numérico), `offset` (opcional, numérico).\n\n**Salida 200**: `data` (colección de GIFs) y `pagination` (`total_count`, `count`, `offset`). El script de test guarda el primer resultado en `gif_id`.\n\n**Errores**: `401` sin token o token vencido, `422` validación, `502`/`504` GIPHY no disponible o sin respuesta."
+            },
+            "response": []
+        },
+        {
+            "name": "Buscar GIF por ID",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                            "pm.test('Status is 200', function () {",
+                            "    pm.response.to.have.status(200);",
+                            "});",
+                            "",
+                            "pm.test('Response has the gif data', function () {",
+                            "    const gif = pm.response.json().data;",
+                            "    pm.expect(gif.id).to.eql(pm.environment.get('gif_id'));",
+                            "    pm.expect(gif).to.have.keys('id', 'title', 'url', 'image_url', 'preview_url', 'rating', 'username');",
+                            "});"
+                        ]
+                    }
+                }
+            ],
+            "request": {
+                "method": "GET",
+                "header": [
+                    { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                    "raw": "{{base_url}}/api/v1/gifs/{{gif_id}}",
+                    "host": ["{{base_url}}"],
+                    "path": ["api", "v1", "gifs", "{{gif_id}}"]
+                },
+                "description": "Obtiene la información de un GIF específico. Requiere autenticación.\n\n**Entrada**: `id` en la ruta (requerido). GIPHY usa identificadores alfanuméricos (p. ej. `xT9IgzoKnwFNmISR8I`).\n\n**Salida 200**: `data` con el recurso consultado.\n\n**Errores**: `401` sin token o token vencido, `404` GIF inexistente o ID malformado, `502`/`504` GIPHY no disponible o sin respuesta."
+            },
+            "response": []
+        },
+        {
+            "name": "Guardar GIF favorito",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                            "pm.test('Status is 201', function () {",
+                            "    pm.response.to.have.status(201);",
+                            "});",
+                            "",
+                            "pm.test('Favorite is returned', function () {",
+                            "    const favorite = pm.response.json().data;",
+                            "    pm.expect(favorite.gif_id).to.eql(pm.environment.get('gif_id'));",
+                            "    pm.expect(favorite.alias).to.eql('Mi gato favorito');",
+                            "});"
+                        ]
+                    }
+                }
+            ],
+            "request": {
+                "method": "POST",
+                "header": [
+                    { "key": "Accept", "value": "application/json" },
+                    { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"gif_id\": \"{{gif_id}}\",\n    \"alias\": \"Mi gato favorito\",\n    \"user_id\": {{user_id}}\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/api/v1/favorites",
+                    "host": ["{{base_url}}"],
+                    "path": ["api", "v1", "favorites"]
+                },
+                "description": "Guarda un GIF como favorito del usuario autenticado. Requiere autenticación.\n\n**Entrada (JSON)**: `gif_id` (requerido, alfanumérico), `alias` (requerido, máx. 100 caracteres), `user_id` (requerido, numérico; debe coincidir con el usuario del token).\n\n**Salida 201**: `data` con `id`, `user_id`, `gif_id`, `alias`, `created_at`.\n\n**Errores**: `401` sin token, `403` `user_id` distinto al usuario autenticado, `404` el GIF no existe en GIPHY, `409` el GIF ya es favorito del usuario, `422` validación, `502`/`504` GIPHY no disponible."
+            },
+            "response": []
+        }
+    ]
+}
